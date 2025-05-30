@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Інтерактивна публікація курсу</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #334155;
+        }
+        .accordion-header {
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .accordion-header:hover {
+            background-color: #e2e8f0;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        .accordion-content.active {
+            max-height: 500px; /* Adjust as needed for content length */
+            transition: max-height 0.5s ease-in;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="max-w-4xl mx-auto bg-white shadow-lg rounded-xl p-6 sm:p-8">
+        <h1 class="text-3xl sm:text-4xl font-bold text-center text-blue-700 mb-8">Зміст курсу: Хмарні Технології</h1>
+
+        <div id="course-content">
+            </div>
+    </div>
+
+    <script>
+        // Array of lecture topics
+        const lectureTopics = [
+            "Лекція 1. Суть хмарних технологій",
+            "Лекція 2. Переваги та недоліки хмарних технологій",
+            "Лекція 3. Багатошарова архітектура хмарних додатків",
+            "Лекція 4. Cloud Computing VS Grid Computing",
+            "Лекція 5. Додатки у хмарах",
+            "Лекція 6. Типи хмар",
+            "Лекція 7. Моделі хмарних сервісів",
+            "Лекція 8. Візуалізація в хмарних обчисленнях",
+            "Лекція 9. Компанії-постачальники хмарних послуг",
+            "Лекція 10. Моделі хмарного розгортання",
+            "Лекція 11. Контейнер як послуга (CaaS) у хмарних обчисленнях",
+            "Лекція 12. Хмарні сервери",
+            "Лекція 13. Архітектура безпеки хмарних обчислень",
+            "Лекція 14. Балансування навантаження в хмарних обчисленнях",
+            "Лекція 15. Кар'єра в хмарних обчисленнях"
+        ];
+
+        const courseContentDiv = document.getElementById('course-content');
+
+        // Function to fetch theoretical content for a given topic
+        async function fetchLectureContent(topic) {
+            try {
+                // Check if the API key is available from the Canvas environment
+                const apiKey = typeof __api_key !== 'undefined' ? __api_key : "";
+
+                if (!apiKey) {
+                    console.error("API Key is missing. Please ensure it's provided by the Canvas environment.");
+                    return "Помилка: API-ключ відсутній. Будь ласка, переконайтеся, що він надається середовищем Canvas.";
+                }
+
+                // Construct the prompt for the Gemini API
+                const prompt = `Надай коротку теоретичну інформацію (2-3 речення) про: "${topic}" українською мовою.`;
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+                const payload = { contents: chatHistory };
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                // Check if the HTTP response itself was successful
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`API Error: ${response.status} - ${response.statusText}`, errorText);
+                    return `Помилка API: ${response.status}. Деталі: ${errorText.substring(0, Math.min(errorText.length, 100))}...`; // Truncate for display
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    console.error("Unexpected API response structure or no content:", result);
+                    if (result.error && result.error.message) {
+                        return `Помилка: ${result.error.message}`;
+                    }
+                    return "Не вдалося завантажити інформацію. Неочікувана відповідь API.";
+                }
+            } catch (error) {
+                console.error("Помилка при отриманні вмісту лекції (мережева або JSON парсинг):", error);
+                return `Помилка завантаження інформації: ${error.message}. Перевірте підключення або спробуйте пізніше.`;
+            }
+        }
+
+        // Function to create and append lecture sections
+        async function createLectureSection(topic, index) {
+            const lectureDiv = document.createElement('div');
+            lectureDiv.className = 'mb-4 border border-gray-200 rounded-lg overflow-hidden';
+
+            const header = document.createElement('div');
+            header.className = 'accordion-header bg-blue-50 p-4 flex items-center justify-between text-lg font-semibold text-blue-800';
+            header.innerHTML = `
+                <span>${topic}</span>
+                <svg class="w-5 h-5 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            `;
+            lectureDiv.appendChild(header);
+
+            const content = document.createElement('div');
+            content.className = 'accordion-content bg-white p-4 text-gray-700';
+            lectureDiv.appendChild(content);
+
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'flex items-center justify-center p-4';
+            loadingIndicator.innerHTML = '<div class="spinner"></div> <span class="ml-2 text-blue-600">Завантаження...</span>';
+            content.appendChild(loadingIndicator);
+
+            courseContentDiv.appendChild(lectureDiv);
+
+            let isContentLoaded = false; // Flag to prevent multiple fetches
+
+            header.addEventListener('click', async () => {
+                const svgIcon = header.querySelector('svg');
+                content.classList.toggle('active');
+                svgIcon.classList.toggle('rotate-180');
+
+                if (content.classList.contains('active') && !isContentLoaded) {
+                    loadingIndicator.style.display = 'flex'; // Show spinner
+                    const theoreticalInfo = await fetchLectureContent(topic);
+                    content.innerHTML = `<p>${theoreticalInfo}</p>`; // Update content
+                    loadingIndicator.style.display = 'none'; // Hide spinner
+                    isContentLoaded = true;
+                } else if (!content.classList.contains('active') && isContentLoaded) {
+                    // When collapsing, if content was loaded, clear it to force re-fetch if expanded again
+                    // This is optional, but ensures fresh content if needed
+                    // content.innerHTML = '';
+                    // isContentLoaded = false;
+                }
+            });
+        }
+
+        // Initialize the course content
+        window.onload = () => {
+            lectureTopics.forEach((topic, index) => {
+                createLectureSection(topic, index);
+            });
+        };
+    </script>
+</body>
+</html>
